@@ -29,7 +29,7 @@ namespace AWSUtils.Tests.Streaming
         private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private readonly string clusterId;
+        private readonly string serviceId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
@@ -43,19 +43,19 @@ namespace AWSUtils.Tests.Streaming
 
             this.output = output;
             this.fixture = fixture;
-            this.clusterId = MakeClusterId();
+            this.serviceId = MakeServiceId();
         }
 
         public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
         {
-            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            if (AWSTestConstants.IsSqsAvailable)
             {
                 await SQSStreamProviderUtils.DeleteAllUsedQueues(
                     SQS_STREAM_PROVIDER_NAME,
-                    this.clusterId,
-                    AWSTestConstants.DefaultSQSConnectionString,
+                    this.serviceId,
+                    AWSTestConstants.DefaultSqsOptions,
                     NullLoggerFactory.Instance);
             }
         }
@@ -63,10 +63,7 @@ namespace AWSUtils.Tests.Streaming
         [SkippableFact]
         public async Task SendAndReceiveFromSQS()
         {
-            var options = new SqsOptions
-            {
-                ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
-            };
+            var options = AWSTestConstants.DefaultSqsOptions;
             var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), null, Options.Create(new ClusterOptions()), null, null);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
@@ -198,11 +195,9 @@ namespace AWSUtils.Tests.Streaming
             }).ToList();
         }
 
-        internal static string MakeClusterId()
+        internal static string MakeServiceId()
         {
-            const string DeploymentIdFormat = "cluster-{0}";
-            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-            return String.Format(DeploymentIdFormat, now);
+            return $"service-{DateTime.UtcNow:yyyy-MM-dd-hh-mm-ss-ffff}";
         }
     }
 }

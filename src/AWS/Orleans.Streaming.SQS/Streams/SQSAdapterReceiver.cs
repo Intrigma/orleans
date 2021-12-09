@@ -1,4 +1,3 @@
-﻿using Orleans;
 using Orleans.Streams;
 using OrleansAWSUtils.Storage;
 using System;
@@ -6,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Serialization;
 using SQSMessage = Amazon.SQS.Model.Message;
 
@@ -22,23 +22,24 @@ namespace OrleansAWSUtils.Streams
         private readonly ILogger logger;
         private readonly SerializationManager serializationManager;
 
-
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string serviceId, SqsOptions sqsOptions)
         {
-            if (queueId == null) throw new ArgumentNullException("queueId");
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
+            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
+            if (sqsOptions == null) throw new ArgumentNullException(nameof(sqsOptions));
+            if (string.IsNullOrEmpty(sqsOptions.ConnectionString))
+                throw new ArgumentException($"Must have not null {nameof(sqsOptions.ConnectionString)} value", nameof(sqsOptions));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
-            var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, serviceId);
+            var queue = new SQSStorage(loggerFactory, queueId.ToString(), serviceId, sqsOptions);
             return new SQSAdapterReceiver(serializationManager, loggerFactory, queueId, queue);
         }
 
         private SQSAdapterReceiver(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
         {
-            if (queueId == null) throw new ArgumentNullException("queueId");
-            if (queue == null) throw new ArgumentNullException("queue");
+            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
+            if (queue == null) throw new ArgumentNullException(nameof(queue));
 
             Id = queueId;
             this.queue = queue;

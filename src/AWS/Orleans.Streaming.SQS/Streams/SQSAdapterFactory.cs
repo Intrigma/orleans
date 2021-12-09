@@ -47,7 +47,6 @@ namespace OrleansAWSUtils.Streams
             adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
         }
 
-
         /// <summary> Init the factory.</summary>
         public virtual void Init()
         {
@@ -61,7 +60,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SQSAdapter(this.serializationManager, this.streamQueueMapper, this.loggerFactory, this.sqsOptions.ConnectionString, this.clusterOptions.ServiceId, this.providerName);
+            var adapter = new SQSAdapter(serializationManager, streamQueueMapper, loggerFactory, sqsOptions, clusterOptions.ServiceId, providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

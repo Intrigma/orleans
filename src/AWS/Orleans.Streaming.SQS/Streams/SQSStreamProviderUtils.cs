@@ -17,9 +17,9 @@ namespace OrleansAWSUtils.Streams
         /// Async method to delete all used queues, for specific provider and clusterId
         /// </summary>
         /// <returns> Task object for this async method </returns>
-        public static async Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task DeleteAllUsedQueues(string providerName, string serviceId, SqsOptions sqsOptions, ILoggerFactory loggerFactory)
         {
-            if (clusterId != null)
+            if (serviceId != null)
             {
                 var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
@@ -27,7 +27,7 @@ namespace OrleansAWSUtils.Streams
                 var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)
                 {
-                    var manager = new SQSStorage(loggerFactory, queueId.ToString(), storageConnectionString, clusterId);
+                    var manager = new SQSStorage(loggerFactory, queueId.ToString(), serviceId, sqsOptions);
                     manager.InitQueueAsync().Wait();
                     deleteTasks.Add(manager.DeleteQueue());
                 }

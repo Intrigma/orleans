@@ -6,10 +6,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
+using Amazon.SQS.Util;
 using Microsoft.Extensions.Logging;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
 using Orleans;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Storage
 {
@@ -26,6 +28,10 @@ namespace OrleansAWSUtils.Storage
         private const string SecretKeyPropertyName = "SecretKey";
         private const string ServicePropertyName = "Service";
         private ILogger Logger;
+#nullable enable
+        private readonly IDictionary<string, string>? _attributes;
+        private readonly IDictionary<string, string>? _tags;
+#nullable restore
         private string accessKey;
         private string secretKey;
         private string service;
@@ -38,16 +44,31 @@ namespace OrleansAWSUtils.Storage
         public string QueueName { get; private set; }
 
         /// <summary>
+        /// The queue is FIFO and <see cref="QueueName"/> has ".fifo" suffix
+        /// </summary>
+        public bool IsFifo { get; }
+
+        public bool UsesContentBasedDeduplication { get; }
+
+        /// <summary>
         /// Default Ctor
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">The name of the queue</param>
-        /// <param name="connectionString">The connection string</param>
         /// <param name="serviceId">The service ID</param>
-        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string connectionString, string serviceId = "")
+        /// <param name="sqsOptions">SQS options</param>
+        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string serviceId, SqsOptions sqsOptions)
         {
             QueueName = string.IsNullOrWhiteSpace(serviceId) ? queueName : $"{serviceId}-{queueName}";
-            ParseDataConnectionString(connectionString);
+            ParseDataConnectionString(sqsOptions.ConnectionString);
+            _attributes = sqsOptions.QueueAttributes;
+            _tags = sqsOptions.QueueTags;
+            IsFifo = _attributes?.ContainsKey(SQSConstants.ATTRIBUTE_FIFO_QUEUE) == true;
+            if (IsFifo)
+            {
+                QueueName += ".fifo";
+            }
+            UsesContentBasedDeduplication = _attributes?.ContainsKey(SQSConstants.ATTRIBUTE_CONTENT_BASED_DEDUPLICATION) == true;
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
         }
@@ -129,7 +150,22 @@ namespace OrleansAWSUtils.Storage
             {
                 if (string.IsNullOrWhiteSpace(await GetQueueUrl()))
                 {
-                    var response = await sqsClient.CreateQueueAsync(QueueName);
+                    var request = new CreateQueueRequest(this.QueueName);
+                    if (_attributes?.Count > 0)
+                    {
+                        foreach (var attribute in _attributes)
+                        {
+                            request.Attributes.Add(attribute.Key, attribute.Value);
+                        }
+                    }
+                    if (_tags?.Count > 0)
+                    {
+                        foreach (var tag in _tags)
+                        {
+                            request.Tags.Add(tag.Key, tag.Value);
+                        }
+                    }
+                    var response = await this.sqsClient.CreateQueueAsync(request);
                     queueUrl = response.QueueUrl;
                 }
             }
@@ -217,7 +253,7 @@ namespace OrleansAWSUtils.Storage
                     throw new ArgumentNullException(nameof(message));
 
                 if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
-                    throw new ArgumentNullException(nameof(message.ReceiptHandle));
+                    throw new ArgumentNullException(nameof(message), $"{nameof(message.ReceiptHandle)} should be neither null nor white space");
 
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");

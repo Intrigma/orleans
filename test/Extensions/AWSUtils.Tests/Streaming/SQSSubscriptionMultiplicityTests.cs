@@ -18,7 +18,6 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private string StreamConnectionString = AWSTestConstants.DefaultSQSConnectionString;
         private SubscriptionMultiplicityTestRunner runner;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -40,7 +39,7 @@ namespace AWSUtils.Tests.Streaming
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddSqsStreams(SQSStreamProviderName, options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                     });
             }
         }
@@ -52,7 +51,7 @@ namespace AWSUtils.Tests.Streaming
                 clientBuilder
                     .AddSqsStreams(SQSStreamProviderName, options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                     });
             }
         }
@@ -65,11 +64,11 @@ namespace AWSUtils.Tests.Streaming
 
         public override async Task DisposeAsync()
         {
-            var clusterId = HostedCluster.Options.ClusterId;
+            var serviceId = HostedCluster.Options.ServiceId;
             await base.DisposeAsync();
-            if (!string.IsNullOrWhiteSpace(StreamConnectionString))
+            if (AWSTestConstants.IsSqsAvailable)
             {
-                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StreamConnectionString, NullLoggerFactory.Instance);
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, serviceId, AWSTestConstants.DefaultSqsOptions, NullLoggerFactory.Instance);
             }
         }
 

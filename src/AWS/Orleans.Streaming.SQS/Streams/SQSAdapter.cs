@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace OrleansAWSUtils.Streams
@@ -13,7 +14,7 @@ namespace OrleansAWSUtils.Streams
     {
         protected readonly string ServiceId;
         private readonly SerializationManager serializationManager;
-        protected readonly string DataConnectionString;
+        private readonly SqsOptions _sqsOptions;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
         private readonly ILoggerFactory loggerFactory;
@@ -22,13 +23,16 @@ namespace OrleansAWSUtils.Streams
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public SQSAdapter(SerializationManager serializationManager, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string serviceId, string providerName)
+        public SQSAdapter(SerializationManager serializationManager, IConsistentRingStreamQueueMapper streamQueueMapper,
+            ILoggerFactory loggerFactory, SqsOptions sqsOptions, string serviceId, string providerName)
         {
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
+            if (sqsOptions == null) throw new ArgumentNullException(nameof(sqsOptions));
+            if (string.IsNullOrEmpty(sqsOptions.ConnectionString))
+                throw new ArgumentException($"{nameof(sqsOptions.ConnectionString)} must be neither null nor empty", nameof(sqsOptions));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             this.loggerFactory = loggerFactory;
             this.serializationManager = serializationManager;
-            DataConnectionString = dataConnectionString;
+            _sqsOptions = sqsOptions;
             this.ServiceId = serviceId;
             Name = providerName;
             this.streamQueueMapper = streamQueueMapper;
@@ -36,24 +40,34 @@ namespace OrleansAWSUtils.Streams
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return SQSAdapterReceiver.Create(this.serializationManager, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
+            return SQSAdapterReceiver.Create(serializationManager, loggerFactory, queueId, ServiceId, _sqsOptions);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null)
             {
-                throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", "token");
+                throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
             }
             var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             SQSStorage queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, this.ServiceId);
+                var tmpQueue = new SQSStorage(loggerFactory, queueId.ToString(), ServiceId, _sqsOptions);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
+
             var msg = SQSBatchContainer.ToSQSMessage(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
+            if (queue.IsFifo)
+            {
+                msg.MessageGroupId = _sqsOptions.FifoMessageGroupId;
+                if (!queue.UsesContentBasedDeduplication)
+                {
+                    msg.MessageDeduplicationId = _sqsOptions.FifoMessageDeduplicationIdGenerator?.Invoke();
+                }
+            }
+
             await queue.AddMessage(msg);
         }
     }

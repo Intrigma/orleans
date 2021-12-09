@@ -2,6 +2,7 @@ using AWSUtils.Tests.StorageTests;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tester.StreamingTests;
@@ -20,7 +21,6 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private string StorageConnectionString = AWSTestConstants.DefaultSQSConnectionString;
 
         private readonly ITestOutputHelper output;
         private ClientStreamTestRunner runner;
@@ -54,7 +54,7 @@ namespace AWSUtils.Tests.Streaming
                 hostBuilder
                     .AddSqsStreams(SQSStreamProviderName, options => 
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                     })
                     .AddMemoryGrainStorage("PubSubStore")
                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
@@ -68,18 +68,18 @@ namespace AWSUtils.Tests.Streaming
                 clientBuilder
                     .AddSqsStreams(SQSStreamProviderName, options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                     });
             }
         }
 
         public override async Task DisposeAsync()
         {
-            var clusterId = HostedCluster.Options.ClusterId;
+            var serviceId = HostedCluster.Options.ServiceId;
             await base.DisposeAsync();
-            if (!string.IsNullOrWhiteSpace(StorageConnectionString))
+            if (AWSTestConstants.IsSqsAvailable)
             {
-                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StorageConnectionString, NullLoggerFactory.Instance);
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, serviceId, AWSTestConstants.DefaultSqsOptions, NullLoggerFactory.Instance);
             }
         }
 

@@ -1,15 +1,11 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
-using Orleans.Providers.Streams;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
 using Xunit;
-using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.Streaming;
 using OrleansAWSUtils.Streams;
@@ -42,11 +38,11 @@ namespace AWSUtils.Tests.Streaming
                     .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                     })
                     .AddSqsStreams("SQSProvider2", options =>
                      {
-                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                         options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                      })
                     .AddDynamoDBGrainStorage("DynamoDBStore", options =>
                     {
@@ -74,11 +70,11 @@ namespace AWSUtils.Tests.Streaming
                     .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {
-                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSqsOptions.ConnectionString;
                     });
             }
         }
-        
+
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
@@ -87,11 +83,11 @@ namespace AWSUtils.Tests.Streaming
 
         public override async Task DisposeAsync()
         {
-            var clusterId = HostedCluster.Options.ClusterId;
+            var serviceId = HostedCluster.Options.ServiceId;
             await base.DisposeAsync();
-            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            if (AWSTestConstants.IsSqsAvailable)
             {
-                SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+                SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, serviceId, AWSTestConstants.DefaultSqsOptions, NullLoggerFactory.Instance).Wait();
             }
         }
 

@@ -6,6 +6,7 @@ using Orleans.AWSUtils.Tests;
 using Orleans.Internal;
 using System;
 using System.Collections.Generic;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.StorageTests
 {
@@ -40,13 +41,16 @@ namespace AWSUtils.Tests.StorageTests
             }
         });
 
-        public static string DefaultSQSConnectionString = "";
+        public static SqsOptions DefaultSqsOptions = new()
+        {
+            ConnectionString = ""
+        };
 
         public static string AccessKey { get; set; }
         public static string SecretKey { get; set; }
         public static string Service { get; set; } = "http://localhost:8000";
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
-        public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(DefaultSQSConnectionString);
+        public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(DefaultSqsOptions.ConnectionString);
     }
 }
