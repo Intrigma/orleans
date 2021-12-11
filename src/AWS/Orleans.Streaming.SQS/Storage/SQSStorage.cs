@@ -241,25 +241,31 @@ namespace OrleansAWSUtils.Storage
         }
 
         /// <summary>
-        /// Delete a message from SQS queue
+        /// Delete messages from SQS queue
         /// </summary>
-        /// <param name="message">The message to be deleted</param>
+        /// <param name="messages">The messages to be deleted</param>
         /// <returns></returns>
-        public async Task DeleteMessage(SQSMessage message)
+        public async Task DeleteMessagesAsync(ICollection<SQSMessage> messages)
         {
             try
             {
-                if (message == null)
-                    throw new ArgumentNullException(nameof(message));
+                if (messages == null)
+                    throw new ArgumentNullException(nameof(messages));
 
-                if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
-                    throw new ArgumentNullException(nameof(message), $"{nameof(message.ReceiptHandle)} should be neither null nor white space");
+                if (messages.Count == 0)
+                    return;
+
+                if (messages.Any(message => string.IsNullOrWhiteSpace(message.ReceiptHandle)))
+                    throw new ArgumentException($"{nameof(SQSMessage.ReceiptHandle)} should be neither null nor white space for each item", nameof(messages));
 
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
 
-                await sqsClient.DeleteMessageAsync(
-                    new DeleteMessageRequest { QueueUrl = queueUrl, ReceiptHandle = message.ReceiptHandle });
+                var entries = messages
+                    .Select((message, i) => new DeleteMessageBatchRequestEntry(i.ToString(), message.ReceiptHandle))
+                    .ToList();
+
+                await sqsClient.DeleteMessageBatchAsync(new DeleteMessageBatchRequest(this.queueUrl, entries));
             }
             catch (Exception exc)
             {
