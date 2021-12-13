@@ -209,6 +209,9 @@ namespace OrleansAWSUtils.Storage
 
                 message.QueueUrl = queueUrl;
                 await sqsClient.SendMessageAsync(message);
+
+                Logger.Info("SendMessageAsync sent 1 message");
+
             }
             catch (Exception exc)
             {
@@ -233,6 +236,9 @@ namespace OrleansAWSUtils.Storage
 
                 var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEAK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEAK };
                 var response = await sqsClient.ReceiveMessageAsync(request);
+
+                Logger.Info($"ReceiveMessageAsync returned {response.Messages?.Count} messages");
+
                 return response.Messages;
             }
             catch (Exception exc)
