@@ -124,7 +124,8 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        private async Task<string> GetQueueUrl()
+#nullable enable
+        private async Task<string?> GetQueueUrl()
         {
             try
             {
@@ -139,6 +140,7 @@ namespace OrleansAWSUtils.Storage
                 return null;
             }
         }
+#nullable restore
 
         /// <summary>
         /// Initialize SQSStorage by creating or connecting to an existent queue
